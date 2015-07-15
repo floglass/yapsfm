@@ -225,11 +225,11 @@ class Aperture(OpticalArray):
         """
         Opens an aperture fits file and reads it.
         """
-        hdu = fits.open(input_file)
-        if len(hdu) < 2:  # check if aperture.fits has a header (it should not)
-            self.a = hdu[0].data
-        else:
-            self.a = hdu[1].data
+        with fits.open(input_file) as hdu:
+            if len(hdu) < 2:  # check if aperture.fits has a header (it should not)
+                self.a = hdu[0].data
+            else:
+                self.a = hdu[1].data
 
         self.array_size = np.shape(self.a)[0]
         self.name = input_file.split('.')[0]
@@ -421,6 +421,8 @@ class PolyPSF(OpticalArray):
 
         spectral_interpolation = interp1d(self._x, self._flux, kind='cubic')
 
+        measured_waves = [.76, .869, .927, .977, 1.06, 1.192, 1.131, 1.293, 1.380, 1.454, 1.485, 1.577, 1.683, 1.774,
+                          1.842, 2.00]
         waves = np.linspace(bands[self.band][0], bands[self.band][1], 10)  # Takes 10 wavelengths in band
         self._wavelength_contributions = [waves, spectral_interpolation(waves)]
 
@@ -430,6 +432,7 @@ class PolyPSF(OpticalArray):
         and add them to the list self.b
         if switch=1, will save all of the 10 individual PSFs used to create the polychrome
         """
+        self.b = []
         logging.debug("polychrome array_size=%s" % self.array_size)
         tmp = np.zeros((self.array_size*5, self.array_size*5))  # after FFT, the array will be 5*bigger -> 0-padding
         for i, wavel in enumerate(self._wavelength_contributions[0]):
@@ -441,6 +444,7 @@ class PolyPSF(OpticalArray):
                 psf.save('polyPSF_%s' % wavel)  # will save all the 10 PSFs in separate files if debug mode is on
             logging.debug("psf.a size: %s" % psf.array_size)
             psf.a *= self._wavelength_contributions[1][i]
+            # memory leak in b! calling create_polychrome a lot keeps adding psf.a to self.b
             self.b.append(psf.a)  # add the array to the list of arrays for data cube creation
             tmp += psf.a
         self._a = tmp

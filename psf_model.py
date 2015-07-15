@@ -33,7 +33,7 @@ def main():
                             "Required if polychromatic PSF.")
 
     parser.add_argument('-t', '--type', type=str, dest='spectral_type', default=None, action='store',
-                        choices = ['B', 'A', 'F', 'G', 'K', 'M'],
+                        choices=['B', 'A', 'F', 'G', 'K', 'M'],
                         help="spectral type of target star. B, A, F, G, K, M handled. "
                              "Required if polychromatic PSF.")
     parser.add_argument('-v', '--verbose', type=str, dest='verbose', default='info', action='store',
