@@ -94,6 +94,10 @@ def get_dist(chip, wavelength, position):
     :return: dist = list of interpolated coefficients, from Z1 to Z11
     :rtype: list of float
     """
+    if chip == 0:  # use chip=0 to use null distortion values
+        logging.debug("Input chip==0: no distortion used...")
+        return [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+
     if glob.glob('zernike_coefficients.fits'):
         logging.debug("opening 'zernike_coefficients.fits' and reading data...")
         tbl = fits.open('zernike_coefficients.fits')

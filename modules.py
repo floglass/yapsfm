@@ -34,7 +34,7 @@ class OpticalArray(object):
     The ancestor class, it has the basic properties *array_size*, *center*, *name*, the data array *_a*, and a polar
     coordinates trigger *_polar*, allowing to switch between polar and cartesian coordinate systems.
 
-    init takes: size, polar=False, scale=None, poly=False
+    init takes: size, polar=False, scale=None, poly=False, position on detector (center is 2044, 2044!), chip number
     """
     def __init__(self, size, polar=False, scale=None, poly=False, position=None, chip=None):
         self.array_size = size
@@ -66,7 +66,7 @@ class OpticalArray(object):
 
     def save(self, name=None):
         """
-        Will save the data array "a" in a fits file with header information as follow:
+        Will save the data array "a" in a fits file with header information
         :param name: name of the .fits file to be written. If None, will call it self.name
         :return: None
         """
@@ -131,7 +131,7 @@ class OpticalArray(object):
         """
         Change between polar and cartesian coordinates system
 
-        :return: the (theta,r) values in (x,y)
+        :return: (theta,r) position in (x,y) space
         """
         if not self._polar:
             return
@@ -223,7 +223,7 @@ class Aperture(OpticalArray):
 
     def fits2aperture(self, input_file='aperture.fits'):
         """
-        Opens an aperture fits file and reads it.
+        Opens an aperture fits file and reads it. This is the default aperture used if aperture.fits is not specified
         """
         with fits.open(input_file) as hdu:
             if len(hdu) < 2:  # check if aperture.fits has a header (it should not)
@@ -239,10 +239,11 @@ class Aperture(OpticalArray):
 
 class Pupil(OpticalArray):
     """
-    Pupil inherits from OpticalArray, it has properties *opd* (the optical path differences) and *name*.
-    It can be computed using *_compute_pupil* which uses the opd, or *_path_diff* of the wavefront.
+    Pupil inherits from OpticalArray, it has properties *opd* (the optical path differences), *name*, *wavelength*, and
+    has an array representing the pupil *a*.
+    It can be computed using *_compute_pupil* which uses the opd (or *_path_diff*) of the wavefront.
 
-    init takes: wavelength, array_size
+    init takes: wavelength, array_size, aperture name, position on detector (center at 2044 2044!) and chip number
     """
     def __init__(self, wavelength, array_size, aperture, position, chip):
         super(Pupil, self).__init__(size=array_size, position=position, chip=chip)
@@ -292,10 +293,11 @@ class Pupil(OpticalArray):
 
 class PSF(OpticalArray):
     """
-    PSF inherits from OpticalArray and has properties *array_size*, *pupil*, *_a* the array containing the data, and
-    *name*. Its resolution can be modified using *resize_psf*, which will change the pixel resolution to *scale*.
+    PSF inherits from OpticalArray and has properties *array_size*, *pupil*, *_a* (array containing the data),
+    *name*, *wavelength*, pixel *scale* and *jitter* value.
+    Its resolution can be modified using *resize_psf*, which will change the pixel resolution of the output to *scale*.
 
-    init takes: pupil, scale, array_size
+    init takes: pupil, scale, array_size, position (center at 2044 2044), chip number and jitter value (in arcseconds)
     """
     def __init__(self, pupil, scale, array_size, position, chip, jitter_fwhm=0.01):
         self.array_size = array_size*5  # for 0 padding
@@ -325,13 +327,15 @@ class PSF(OpticalArray):
     def resize_psf(self):
         """
         Re-scale the PSF to the desired pixel resolution (*self.scale*). When calling geometric_transform, the
-        prefilter option has to be turned off (False) because the data is already filtered (no noise).
+        prefilter option has to be turned off (False) because the data is already filtered (no noise?).
         """
         logging.debug("resize_psf parameters: wavelength=%s, array_size=%s, scale=%s" % (self.wavelength,
                                                                                          self.array_size, self.scale))
         logging.info("Resizing PSF to match pixel resolution of %s''/px..." % self.scale)
         logging.debug("before interpolation: max(psf.a)=%s, min(psf.a)=%s" % (np.max(self.a), np.min(self.a)))
-        scale_factor = 0.0797/6.*(self.wavelength/0.76)  # at 5x zero-padding
+
+        scale_factor = 0.0797/5.*(self.wavelength/0.76)  # = 0.01594 at 5x zero-padding
+
         # add jitter to the PSF
         if self.jitter_fwhm > 0:
             self.add_jitter(self.jitter_fwhm, scale_factor)
@@ -344,7 +348,7 @@ class PSF(OpticalArray):
 
     def add_jitter(self, jitter_fwhm, scale_factor):
         """
-        Add jitter to the PSF.
+        Add jitter (in arcseconds) to the PSF.
 
         :param jitter_fwhm: the angular size of the gaussian jitter (in arcseconds)
         :type jitter_fwhm: float
@@ -380,7 +384,8 @@ class PolyPSF(OpticalArray):
     """
     Polychromatic PSF class. Inherits from OpticalArray.
 
-    init takes: band, spectral_type, size, scale=0.01
+    init takes: band, spectral_type, size, scale=0.01 in arcseconds, aperture name, position (center at 2044 2044) and
+    chip number.
     """
     def __init__(self, band, spectral_type, size, scale, aperture, position, chip):
         super(PolyPSF, self).__init__(size=size, poly=True, scale=scale, position=position, chip=chip)

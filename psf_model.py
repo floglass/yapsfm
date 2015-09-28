@@ -28,7 +28,8 @@ def main():
     group.add_argument('-w', '--wavelength', type=float, dest='wavelength', default=None, action='store',
                        help='wavelength at which to compute the PSF. Between 0.76 and 2.00 microns. '
                             'Required if monochromatic PSF.')
-    group.add_argument('-b', '--band', type=str, dest='band', default=None, action='store', choices=['Z', 'Y', 'J', 'H', 'F', 'Wide'],
+    group.add_argument('-b', '--band', type=str, dest='band', default=None, action='store', choices=['Z', 'Y', 'J', 'H',
+                                                                                                     'F', 'Wide'],
                        help="filter band to use for polychromatic PSF. Z, Y, J, H, F, Wide. "
                             "Required if polychromatic PSF.")
 
@@ -70,7 +71,7 @@ def main():
     if args.position is None or args.chip is None:
         parser.error("--position (-p) and --chip (-c) are required.")
 
-    scale = float(raw_input("final pixel scale in ''/pixel? (0.01) ") or 0.01) if args.scale is None else args.scale
+    scale = args.scale
 
     if glob.glob(args.aperture):  # if there's an aperture.fits file, open it, otherwise, create an HST-like
         with fits.open(args.aperture) as hdu:
@@ -88,7 +89,10 @@ def main():
         wavelength = args.wavelength
         pupil = Pupil(wavelength, size, aperture_name, args.position, args.chip)
         psf = PSF(pupil, scale, size, args.position, args.chip, args.jitter)
-        psf.resize_psf()
+        if not scale:  # if scale==None, do not resize the psf image.
+            logging.debug("no scale defined: psf resampling skipped")
+        else:
+            psf.resize_psf()
         psf.save(name="psf_%s" % wavelength)
     elif args.band:  # if band : polychromatic
         poly = PolyPSF(band=args.band, spectral_type=args.spectral_type, scale=scale, size=size, aperture=aperture_name,
